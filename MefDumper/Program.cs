@@ -3,6 +3,8 @@ using MefDumper.Helpers;
 using Microsoft.Diagnostics.Runtime;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Composition.Hosting;
+using System.Linq;
 using WcfDumper.Helpers;
 
 namespace MefDumper
@@ -11,25 +13,102 @@ namespace MefDumper
     {
         static void Main(string[] args)
         {
-            //var wrapper = ClrMdHelper.LoadDumpFile(@"d:\MefDumper.DMP");
-            //var wrapper = ClrMdHelper.LoadDumpFile(@"d:\mef_devenv.dmp");
-            var wrapper = ClrMdHelper.LoadDumpFile(@"d:\common3.DMP");
+            var retCode = ArgParser.Parse(args, new string[] {  }, new string[] { "-a", "-d" });
 
-            wrapper.TypesToDump.Add(TYPE_CompositionContainer);
+            ValidateArguments();
 
-            wrapper.ClrHeapIsNotWalkableCallback = () =>
+            if (retCode == ErrorCode.Success)
             {
-                Console.WriteLine("Cannot walk the heap!");
-                //Console.WriteLine("PID: {0} - Cannot walk the heap!", pid);
-            };
+                if (ArgParser.SwitchesWithValues.ContainsKey("-a"))
+                {
+                    var assemblies = ArgParser.SwitchesWithValues["-a"].Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                    var aggrCat = new AggregateCatalog(assemblies.Select(x => new AssemblyCatalog(x)));
 
-            wrapper.ClrObjectOfTypeFoundCallback = DumpTypes;
+                    var RESULT = new List<ReflectionComposablePart>();
 
-            wrapper.Process();
+                    using (var container = new CompositionContainer(aggrCat))
+                    {
+                        foreach (var part in container.Catalog.Parts)
+                        {
+                            var rfc = new ReflectionComposablePart();
+                            rfc.TypeName = part.ToString();
+
+                            foreach (var import in part.ImportDefinitions)
+                            {
+                                var impDef = new ImportDefinition();
+                                impDef.ContractName = import.ContractName;
+
+                                var s = import.ToString().Split(new string[] { "\n\t" }, StringSplitOptions.RemoveEmptyEntries);
+                                impDef.RequiredTypeIdentity = s[1].Substring(s[1].IndexOf("\t") + 1);
+                                rfc.Imports.Add(impDef);
+                            }
+
+                            foreach (var export in part.ExportDefinitions)
+                            {
+                                var expDef = new ExportDefinition();
+                                expDef.ContractName = export.ContractName;
+                                expDef.TypeIdentity = (string)export.Metadata["ExportTypeIdentity"];
+                                rfc.Exports.Add(expDef);
+                            }
+
+                            RESULT.Add(rfc);
+                        }
+                    }
+
+                    DgmlHelper.CreateDgml($"d:\\temp\\dgml\\{Guid.NewGuid().ToString()}.dgml", RESULT);
+                }
+                else if (ArgParser.SwitchesWithValues.ContainsKey("-d"))
+                {
+                    string dumpFile = ArgParser.SwitchesWithValues["-d"];
+                    var wrapper = ClrMdHelper.LoadDumpFile(dumpFile);
+                    wrapper.TypesToDump.Add(TYPE_CompositionContainer);
+
+                    wrapper.ClrHeapIsNotWalkableCallback = () =>
+                    {
+                        Console.WriteLine("Cannot walk the heap!");
+                        //Console.WriteLine("PID: {0} - Cannot walk the heap!", pid);
+                    };
+
+                    wrapper.ClrObjectOfTypeFoundCallback = DumpTypes;
+
+                    wrapper.Process();
+                }
+                else
+                {
+                    PrintSyntaxAndExit(retCode);
+                }
+            }
+            else
+            {
+                
+                PrintSyntaxAndExit(retCode);
+            }
+        }
+
+        private static void ValidateArguments()
+        {
+            //TODO: validate various combinations
+        }
+
+        private static void PrintSyntaxAndExit(ErrorCode errorCode)
+        {
+            if (errorCode != ErrorCode.Success)
+            {
+                Console.WriteLine($"Syntax error: {errorCode}");
+            }
+
+            Console.WriteLine("Usage:");
+            Console.WriteLine("MefDumper -d dumpfile");
+            Console.WriteLine(" OR");
+            Console.WriteLine("MefDumper -a assembly1[;assembly2;...;assemblyN]");
+
+            Environment.Exit(1);
         }
 
         private static void DumpTypes(ClrHeap heap, ulong obj, string type)
         {
+            Console.WriteLine($"Dumping CompositionContainer @{obj:X}");
+
             // Check if custom ExportProviders are present
             ulong providersFieldValue = ClrMdHelper.GetObjectAs<ulong>(heap, obj, FIELD_Providers);
 
@@ -40,7 +119,7 @@ namespace MefDumper
 
                 if (providerObjs.Count > 0)
                 {
-                    Console.WriteLine("Custom ExportProvider(s):");
+                    Console.WriteLine("WARNING: custom ExportProvider(s) were found:");
                 }
 
                 foreach (ulong provider in providerObjs)
@@ -58,15 +137,7 @@ namespace MefDumper
                 ulong catalogFieldValue = ClrMdHelper.GetObjectAs<ulong>(heap, catalogExProvider, FIELD_Catalog);
                 HashSet<ulong> parts = new HashSet<ulong>();
 
-                try
-                {
-                    InvokeCatalogHandler(heap, catalogFieldValue, parts);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex);
-                    return;
-                }
+                InvokeCatalogHandler(heap, catalogFieldValue, parts);
 
                 var RESULT = new List<ReflectionComposablePart>();
 
@@ -75,7 +146,8 @@ namespace MefDumper
                     var rcp = new ReflectionComposablePart();
 
                     ulong creationInfoObj = ClrMdHelper.GetLastObjectInHierarchy(heap, part, HIERARCHY_ReflectionComposablePartDefinition_To_AttributedPartCreationInfo, 0);
-                    rcp.TypeName = heap.GetObjectType(creationInfoObj).GetRuntimeType(creationInfoObj).Name;
+                    ClrType creationInfoObjType = heap.GetObjectType(creationInfoObj);
+                    rcp.TypeName = creationInfoObjType.GetRuntimeType(creationInfoObj)?.Name ?? creationInfoObjType.Name;
 
                     // Get ImportDefinition[]
                     ulong importArrayObj = ClrMdHelper.GetObjectAs<ulong>(heap, part, FIELD_Imports);
@@ -107,12 +179,12 @@ namespace MefDumper
 
                             if (typeObj == 0)
                             {
-                                Console.WriteLine($"Special export was found with no type identity");
+                                Console.WriteLine($"WARNING: Special export was found with no type identity (contract: {contract})");
                                 continue;
                             }
-
-                            string typename = heap.GetObjectType(typeObj).GetRuntimeType(typeObj).Name;
-
+                            
+                            ClrType typeObjType = heap.GetObjectType(typeObj);
+                            string typename = typeObjType.GetRuntimeType(typeObj)?.Name ?? typeObjType.Name;
                             rcp.Exports.Add(new ExportDefinition() { ContractName = contract, TypeIdentity = typename });
                         }
                     }
@@ -120,7 +192,15 @@ namespace MefDumper
                     RESULT.Add(rcp);
                 }
 
-                DgmlHelper.CreateDgml($"d:\\temp\\dgml\\{Guid.NewGuid().ToString()}.dgml", RESULT);
+                Console.WriteLine($"{RESULT.Count} parts were found: ");
+                foreach (var part in RESULT)
+                {
+                    Console.WriteLine($"\t{part.TypeName}");
+                }
+
+                Console.WriteLine();
+
+                DgmlHelper.CreateDgml($"d:\\temp\\dgml\\{obj:X}.dgml", RESULT);
             }
 
             // Get activated auto-created parts
@@ -176,11 +256,6 @@ namespace MefDumper
             // Get all auto-created partdescriptions (ReflectionComposablePartDefinition[])
             List<ulong> partObjs = ClrMdHelper.GetLastObjectInHierarchyAsArray(heap, typeCat, HIERARCHY_TypeCatalog_To_ComposablePartDefinitions, 0, TYPE_ComposablePartDefinitionArray);
 
-            if (partObjs.Count > 0)
-            {
-                Console.WriteLine("Parts:");
-            }
-
             foreach (var partObj in partObjs)
             {
                 parts.Add(partObj);                
@@ -190,7 +265,15 @@ namespace MefDumper
         private static void InvokeCatalogHandler(ClrHeap heap, ulong composablePartCatalog, HashSet<ulong> parts)
         {
             string catalogType = heap.GetObjectType(composablePartCatalog).Name;
-            CatalogActionMappings[catalogType](heap, composablePartCatalog, parts);
+
+            if (CatalogActionMappings.ContainsKey(catalogType))
+            {
+                CatalogActionMappings[catalogType](heap, composablePartCatalog, parts);
+            }
+            else
+            {
+                Console.WriteLine($"WARNING: unknown catalog type: '{catalogType}'");
+            }
         }
 
         private static string[] HIERARCHY_AggregateCatalog_To_ComposablePartCatalogs = new string[] { "_catalogs", "_catalogs", "_items" };

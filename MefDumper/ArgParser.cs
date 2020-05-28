@@ -11,6 +11,7 @@ namespace MefDumper
         WhiteSpace,
         MissingValueForSwitch,
         InvalidValueForSwitch,
+        InvalidSwitch,
     }
 
     public static class ArgParser
@@ -19,7 +20,7 @@ namespace MefDumper
         public static Dictionary<string, string> SwitchesWithValues { get; set; } = new Dictionary<string, string>();
         public static List<string> OrdinaryArguments { get; set; } = new List<string>();
 
-        public static ErrorCode Parse(string[] args, string[] expectedSwitches)
+        public static ErrorCode Parse(string[] args, string[] expectedSwitches, string[] expectedSwitchesWithValues)
         {
             if (args.Length == 0)
             {
@@ -48,9 +49,13 @@ namespace MefDumper
                     {
                         Switches.Add(arg);
                     }
-                    else
+                    else if (expectedSwitchesWithValues.Contains(arg))
                     {
                         lastSwitch = arg;
+                    }
+                    else
+                    {
+                        return ErrorCode.InvalidSwitch;
                     }
                 }
                 else if (lastSwitch != null)
