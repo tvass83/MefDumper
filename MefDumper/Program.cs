@@ -4,6 +4,7 @@ using Microsoft.Diagnostics.Runtime;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition.Hosting;
+using System.IO;
 using System.Linq;
 using WcfDumper.Helpers;
 
@@ -13,7 +14,7 @@ namespace MefDumper
     {
         static void Main(string[] args)
         {
-            var retCode = ArgParser.Parse(args, new string[] {  }, new string[] { "-a", "-d" });
+            var retCode = ArgParser.Parse(args, new string[] { }, new string[] { "-a", "-d" });
 
             ValidateArguments();
 
@@ -22,6 +23,11 @@ namespace MefDumper
                 if (ArgParser.SwitchesWithValues.ContainsKey("-a"))
                 {
                     var assemblies = ArgParser.SwitchesWithValues["-a"].Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var asm in assemblies)
+                    {
+                        ValidateFile(asm);
+                    }
+
                     var aggrCat = new AggregateCatalog(assemblies.Select(x => new AssemblyCatalog(x)));
 
                     var RESULT = new List<ReflectionComposablePart>();
@@ -60,6 +66,8 @@ namespace MefDumper
                 else if (ArgParser.SwitchesWithValues.ContainsKey("-d"))
                 {
                     string dumpFile = ArgParser.SwitchesWithValues["-d"];
+                    ValidateFile(dumpFile);
+
                     var wrapper = ClrMdHelper.LoadDumpFile(dumpFile);
                     wrapper.TypesToDump.Add(TYPE_CompositionContainer);
 
@@ -80,7 +88,7 @@ namespace MefDumper
             }
             else
             {
-                
+
                 PrintSyntaxAndExit(retCode);
             }
         }
@@ -88,6 +96,18 @@ namespace MefDumper
         private static void ValidateArguments()
         {
             //TODO: validate various combinations
+        }
+
+        private static void ValidateFile(string path)
+        {
+            bool ret = File.Exists(path);
+
+            if (!ret)
+            {
+                Console.WriteLine($"ERROR: The following file does not exist:");
+                Console.WriteLine($"\t{path}");
+                Environment.Exit(1);
+            }
         }
 
         private static void PrintSyntaxAndExit(ErrorCode errorCode)
@@ -182,7 +202,7 @@ namespace MefDumper
                                 Console.WriteLine($"WARNING: Special export was found with no type identity (contract: {contract})");
                                 continue;
                             }
-                            
+
                             ClrType typeObjType = heap.GetObjectType(typeObj);
                             string typename = typeObjType.GetRuntimeType(typeObj)?.Name ?? typeObjType.Name;
                             rcp.Exports.Add(new ExportDefinition() { ContractName = contract, TypeIdentity = typename });
@@ -258,7 +278,7 @@ namespace MefDumper
 
             foreach (var partObj in partObjs)
             {
-                parts.Add(partObj);                
+                parts.Add(partObj);
             }
         }
 
