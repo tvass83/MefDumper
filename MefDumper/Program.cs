@@ -126,7 +126,7 @@ namespace MefDumper
         }
 
         private static void DumpTypes(ClrHeap heap, ulong obj, string type)
-        {
+        {            
             Console.WriteLine($"Dumping CompositionContainer @{obj:X}");
 
             // Check if custom ExportProviders are present
@@ -149,6 +149,9 @@ namespace MefDumper
                 }
             }
 
+            // Get ComposablePart[] from ComposablePartExportProvider
+            List<ulong> composableParts = ClrMdHelper.GetLastObjectInHierarchyAsArray(heap, obj, HIERARCHY_CompositionContainer_To_ComposableParts, 0, TYPE_ComposablePart);
+            
             // Check if there exists a CatalogExportProvider
             ulong catalogExProvider = ClrMdHelper.GetObjectAs<ulong>(heap, obj, FIELD_CatalogExportProvider);
 
@@ -220,11 +223,28 @@ namespace MefDumper
 
                 Console.WriteLine();
 
+                // Get activated auto-created parts
+                var activePartObjs = ClrMdHelper.GetLastObjectInHierarchyAsKVPs(heap, catalogExProvider, HIERARCHY_CatalogExportProvider_To_Activated, 0, TYPE_ComposablePartDefinitionArray2);
+                var activatedPartNames = new HashSet<string>();
+
+                foreach (var activePart in activePartObjs)
+                {
+                    ulong creationInfoObj = ClrMdHelper.GetLastObjectInHierarchy(heap, activePart.key, HIERARCHY_ReflectionComposablePartDefinition_To_AttributedPartCreationInfo, 0);
+                    ClrType creationInfoObjType = heap.GetObjectType(creationInfoObj);
+                    string s = creationInfoObjType.GetRuntimeType(creationInfoObj)?.Name ?? creationInfoObjType.Name;
+                    activatedPartNames.Add(s);                    
+                }
+
+                foreach (var rcp in RESULT)
+                {
+                    if (activatedPartNames.Contains(rcp.TypeName))
+                    {
+                        rcp.IsCreated = true;
+                    }
+                }
+
                 DgmlHelper.CreateDgml($"d:\\temp\\dgml\\{obj:X}.dgml", RESULT);
             }
-
-            // Get activated auto-created parts
-            //var activePartObjs = ClrMdHelper.GetLastObjectInHierarchyAsKVPs(heap, obj, HIERARCHY_CompositionContainer_To_Activated, 0, TYPE_ComposablePartDefinitionArray2);
         }
 
         private static void ProcessAggregateCatalog(ClrHeap heap, ulong aggrCat, HashSet<ulong> parts)
@@ -302,7 +322,7 @@ namespace MefDumper
 
         private static string[] HIERARCHY_CatalogExportProvider_To_Activated = new string[] { "_activatedParts", "entries" };
         private static string[] HIERARCHY_ReflectionComposablePartDefinition_To_AttributedPartCreationInfo = new string[] { "_creationInfo", "_type" };
-        private static string[] HIERARCHY_CompositionContainer_To_ExportProviders = new string[] { "" };
+        private static string[] HIERARCHY_CompositionContainer_To_ComposableParts = new string[] { "_partExportProvider", "_parts", "_items" };
 
         private static string FIELD_CatalogExportProvider = "_catalogExportProvider";
         private static string FIELD_Catalog = "_catalog";
@@ -324,7 +344,7 @@ namespace MefDumper
         private static string TYPE_KVP_String_AssemblyCatalog = "System.Collections.Generic.Dictionary+Entry<System.String,System.ComponentModel.Composition.Hosting.AssemblyCatalog>[]";
         private static string TYPE_ImportDefinitionArray = "System.ComponentModel.Composition.Primitives.ImportDefinition[]";
         private static string TYPE_ExportDefinitionArray = "System.ComponentModel.Composition.Primitives.ExportDefinition[]";
-
+        private static string TYPE_ComposablePart = "System.ComponentModel.Composition.Primitives.ComposablePart[]";
         private static string TYPE_ReflectionComposablePartDefinition = "System.ComponentModel.Composition.ReflectionModel.ReflectionComposablePartDefinition";
 
         private static string TYPE_ApplicationCatalog = "System.ComponentModel.Composition.Hosting.ApplicationCatalog";

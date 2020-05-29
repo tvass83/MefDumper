@@ -28,6 +28,12 @@ namespace MefDumper.Helpers
                     writer.WriteStartElement("Node");
                     writer.WriteAttributeString("Id", part.TypeName);
                     writer.WriteAttributeString("Label", part.TypeName);
+
+                    if (part.IsCreated)
+                    {
+                        writer.WriteAttributeString("Category", "Created");
+                    }
+
                     writer.WriteEndElement();
                 }
 
@@ -55,6 +61,15 @@ namespace MefDumper.Helpers
                         }
                      }
                 }
+
+                writer.WriteEndElement();
+
+                writer.WriteStartElement("Categories");
+
+                writer.WriteStartElement("Category");
+                writer.WriteAttributeString("Id", "Created");
+                writer.WriteAttributeString("Background", "#FF339933");
+                writer.WriteEndElement();
 
                 writer.WriteEndElement();
 
