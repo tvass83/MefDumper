@@ -3,6 +3,7 @@ using Microsoft.Diagnostics.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 using WcfDumper.DataModel;
 
 namespace WcfDumper.Helpers
@@ -103,6 +104,39 @@ namespace WcfDumper.Helpers
             T fieldValue = (T)field.GetValue(heapobject);
 
             return fieldValue;
+        }
+
+        public static string GetStringContents(ClrHeap heap, ulong strAddr)
+        {
+            if (strAddr == 0L)
+            {
+                return null;
+            }
+
+            ClrType clrType = heap.GetObjectType(strAddr);
+            var firstCharField = clrType.GetFieldByName("m_firstChar");
+            var stringLengthField = clrType.GetFieldByName("m_stringLength");
+            
+            int length = 0;
+            if (stringLengthField != null)
+            {
+                length = (int)stringLengthField.GetValue(strAddr);
+            }
+            
+            if (length == 0)
+            {
+                return "";
+            }
+
+            ulong data2 = firstCharField.GetAddress(strAddr);
+            byte[] buffer = new byte[length * 2];
+
+            if (!heap.Runtime.ReadMemory(data2, buffer, buffer.Length, out int _))
+            {
+                return null;
+            }
+
+            return Encoding.Unicode.GetString(buffer);
         }
     }
 }
