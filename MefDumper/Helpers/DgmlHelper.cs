@@ -1,6 +1,6 @@
 ﻿using MefDumper.DataModel;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Xml;
 
 namespace MefDumper.Helpers
@@ -77,6 +77,8 @@ namespace MefDumper.Helpers
 
                 writer.Flush();
             }
+
+            Console.WriteLine($"Output file: {path}");
         }
     }
 }

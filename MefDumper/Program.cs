@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition.Hosting;
 using System.IO;
 using System.Linq;
+using WcfDumper.DataModel;
 using WcfDumper.Helpers;
 
 namespace MefDumper
@@ -14,7 +15,7 @@ namespace MefDumper
     {
         static void Main(string[] args)
         {
-            var retCode = ArgParser.Parse(args, new string[] { }, new string[] { "-a", "-d" });
+            var retCode = ArgParser.Parse(args, new string[] { }, new string[] { "-a", "-d", "-pid" });
 
             ValidateArguments();
 
@@ -69,18 +70,21 @@ namespace MefDumper
                     ValidateFile(dumpFile);
 
                     var wrapper = ClrMdHelper.LoadDumpFile(dumpFile);
-                    wrapper.TypesToDump.Add(TYPE_CompositionContainer);
-
-                    wrapper.ClrHeapIsNotWalkableCallback = () =>
+                    InitAndStartProcessing(wrapper);
+                }
+                else if (ArgParser.SwitchesWithValues.ContainsKey("-pid"))
+                {
+                    if (int.TryParse(ArgParser.SwitchesWithValues["-pid"], out int pid))
                     {
-                        Console.WriteLine("Cannot walk the heap!");
-                        //Console.WriteLine("PID: {0} - Cannot walk the heap!", pid);
-                    };
-
-                    wrapper.ClrObjectOfTypeFoundCallback = DumpTypes;
-
-                    wrapper.Process();
-                }                
+                        var wrapper = ClrMdHelper.AttachToLiveProcess(pid);
+                        InitAndStartProcessing(wrapper);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"ERROR: Invalid process id.");
+                        Environment.Exit(1);
+                    }
+                }
                 else
                 {
                     PrintSyntaxAndExit(retCode);
@@ -88,9 +92,20 @@ namespace MefDumper
             }
             else
             {
-
                 PrintSyntaxAndExit(retCode);
             }
+        }
+
+        private static void InitAndStartProcessing(DataTargetWrapper wrapper)
+        {
+            wrapper.TypesToDump.Add(TYPE_CompositionContainer);
+            wrapper.ClrHeapIsNotWalkableCallback = () =>
+            {
+                Console.WriteLine("ERROR: Cannot walk the heap!");
+            };
+
+            wrapper.ClrObjectOfTypeFoundCallback = DumpTypes;
+            wrapper.Process();
         }
 
         private static void ValidateArguments()
