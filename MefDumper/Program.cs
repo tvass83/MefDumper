@@ -23,9 +23,9 @@ namespace MefDumper
                 if (ArgParser.SwitchesWithValues.ContainsKey("-a"))
                 {
                     var assemblies = ArgParser.SwitchesWithValues["-a"].Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var asm in assemblies)
+                    foreach (var assembly in assemblies)
                     {
-                        ValidateFile(asm);
+                        ValidateFile(assembly);
                     }
 
                     var aggrCat = new AggregateCatalog(assemblies.Select(x => new AssemblyCatalog(x)));
@@ -80,7 +80,7 @@ namespace MefDumper
                     wrapper.ClrObjectOfTypeFoundCallback = DumpTypes;
 
                     wrapper.Process();
-                }
+                }                
                 else
                 {
                     PrintSyntaxAndExit(retCode);
@@ -395,67 +395,53 @@ namespace MefDumper
             }
         }
 
-        private static string[] HIERARCHY_AggregateCatalog_To_ComposablePartCatalogs = new string[] { "_catalogs", "_catalogs", "_items" };
-        private static string[] HIERARCHY_TypeCatalog_To_ComposablePartDefinitions = new string[] { "_parts", "_items" };
-        private static string[] HIERARCHY_DirectoryCatalog_To_AssemblyCatalogs = new string[] { "_assemblyCatalogs", "entries" };
-
-        private static string[] HIERARCHY_CatalogExportProvider_To_Activated = new string[] { "_activatedParts", "entries" };
-        private static string[] HIERARCHY_ReflectionComposablePartDefinition_To_AttributedPartCreationInfo = new string[] { "_creationInfo", "_type" };
-        private static string[] HIERARCHY_CompositionContainer_To_ComposableParts = new string[] { "_partExportProvider", "_parts", "_items" };
-        private static string[] HIERARCHY_SingleExportComposablePart_To_ExportDefinition = new string[] { "_export", "_definition" };
-        private static string[] HIERARCHY_ExportDefinition_To_Metadata = new string[] { "_metadata", "m_dictionary", "entries" };
-
-        private static string FIELD_CatalogExportProvider = "_catalogExportProvider";
-        private static string FIELD_Catalog = "_catalog";
-        private static string FIELD_InnerCatalog = "_innerCatalog";
-        private static string FIELD_Providers = "_providers";
-        private static string FIELD_List = "list";
-        private static string FIELD_Imports = "_imports";
-        private static string FIELD_Export = "_export";
-        private static string FIELD_Exports = "_exports";
-        private static string FIELD_ContractName = "_contractName";
-        private static string FIELD_RequiredTypeIdentity = "_requiredTypeIdentity";
-        private static string FIELD_TypeIdentityType = "_typeIdentityType";
-        private static string FIELD_ExportDefinition = "_exportDefinition";
-        private static string FIELD_Definition = "_definition";
-        private static string FIELD_ExportedValue = "_exportedValue";
-        private static string FIELD_CreationInfo = "_creationInfo";
-        private static string FIELD_Type = "_type";
-        private static string FIELD_OriginalPartCreationInfo = "_originalPartCreationInfo";
+        private static readonly string[] HIERARCHY_AggregateCatalog_To_ComposablePartCatalogs = new string[] { "_catalogs", "_catalogs", "_items" };
+        private static readonly string[] HIERARCHY_CatalogExportProvider_To_Activated = new string[] { "_activatedParts", "entries" };
+        private static readonly string[] HIERARCHY_CompositionContainer_To_ComposableParts = new string[] { "_partExportProvider", "_parts", "_items" };
+        private static readonly string[] HIERARCHY_DirectoryCatalog_To_AssemblyCatalogs = new string[] { "_assemblyCatalogs", "entries" };
+        private static readonly string[] HIERARCHY_ExportDefinition_To_Metadata = new string[] { "_metadata", "m_dictionary", "entries" };
+        private static readonly string[] HIERARCHY_ReflectionComposablePartDefinition_To_AttributedPartCreationInfo = new string[] { "_creationInfo", "_type" };
+        private static readonly string[] HIERARCHY_TypeCatalog_To_ComposablePartDefinitions = new string[] { "_parts", "_items" };
 
         private const string CONST_ExportTypeIdentity = "ExportTypeIdentity";
+        private const string FIELD_Catalog = "_catalog";
+        private const string FIELD_CatalogExportProvider = "_catalogExportProvider";
+        private const string FIELD_ContractName = "_contractName";
+        private const string FIELD_CreationInfo = "_creationInfo";
+        private const string FIELD_Definition = "_definition";
+        private const string FIELD_Export = "_export";
+        private const string FIELD_ExportDefinition = "_exportDefinition";
+        private const string FIELD_ExportedValue = "_exportedValue";
+        private const string FIELD_Exports = "_exports";
+        private const string FIELD_Imports = "_imports";
+        private const string FIELD_InnerCatalog = "_innerCatalog";
+        private const string FIELD_List = "list";
+        private const string FIELD_OriginalPartCreationInfo = "_originalPartCreationInfo";
+        private const string FIELD_Providers = "_providers";
+        private const string FIELD_RequiredTypeIdentity = "_requiredTypeIdentity";
+        private const string FIELD_Type = "_type";
+        private const string FIELD_TypeIdentityType = "_typeIdentityType";
 
-        private static string TYPE_CompositionContainer = "System.ComponentModel.Composition.Hosting.CompositionContainer";
-        private static string TYPE_ComposablePartDefinitionArray = "System.ComponentModel.Composition.Primitives.ComposablePartDefinition[]";
-        private static string TYPE_ComposablePartDefinitionArray2 = "System.Collections.Generic.Dictionary+Entry<System.ComponentModel.Composition.Primitives.ComposablePartDefinition,System.ComponentModel.Composition.Hosting.CatalogExportProvider+CatalogPart>[]";
-        private static string TYPE_ExportProviderArray = "System.ComponentModel.Composition.Hosting.ExportProvider[]";
-        private static string TYPE_ComposablePartCatalogArray = "System.ComponentModel.Composition.Primitives.ComposablePartCatalog[]";
-        private static string TYPE_KVP_String_AssemblyCatalog = "System.Collections.Generic.Dictionary+Entry<System.String,System.ComponentModel.Composition.Hosting.AssemblyCatalog>[]";
-        private static string TYPE_ImportDefinitionArray = "System.ComponentModel.Composition.Primitives.ImportDefinition[]";
-        private static string TYPE_ExportDefinitionArray = "System.ComponentModel.Composition.Primitives.ExportDefinition[]";
-        private static string TYPE_ComposablePart = "System.ComponentModel.Composition.Primitives.ComposablePart[]";
-        private static string TYPE_ReflectionComposablePartDefinition = "System.ComponentModel.Composition.ReflectionModel.ReflectionComposablePartDefinition";
-        private static string TYPE_ReflectionComposablePart = "System.ComponentModel.Composition.ReflectionModel.ReflectionComposablePart";
-        private static string TYPE_SingleExportComposablePart = "System.ComponentModel.Composition.Hosting.CompositionBatch+SingleExportComposablePart";
-        private static string TYPE_KVP_String_Object = "System.Collections.Generic.Dictionary+Entry<System.String,System.Object>[]";
-        private static string TYPE_GenericSpecializationPartCreationInfo = "System.ComponentModel.Composition.ReflectionModel.GenericSpecializationPartCreationInfo";
-        private static string TYPE_AttributedPartCreationInfo = "System.ComponentModel.Composition.AttributedModel.AttributedPartCreationInfo";
+        private const string TYPE_AttributedPartCreationInfo = "System.ComponentModel.Composition.AttributedModel.AttributedPartCreationInfo";
+        private const string TYPE_ComposablePart = "System.ComponentModel.Composition.Primitives.ComposablePart[]";
+        private const string TYPE_ComposablePartCatalogArray = "System.ComponentModel.Composition.Primitives.ComposablePartCatalog[]";
+        private const string TYPE_ComposablePartDefinitionArray = "System.ComponentModel.Composition.Primitives.ComposablePartDefinition[]";
+        private const string TYPE_ComposablePartDefinitionArray2 = "System.Collections.Generic.Dictionary+Entry<System.ComponentModel.Composition.Primitives.ComposablePartDefinition,System.ComponentModel.Composition.Hosting.CatalogExportProvider+CatalogPart>[]";
+        private const string TYPE_CompositionContainer = "System.ComponentModel.Composition.Hosting.CompositionContainer";
+        private const string TYPE_GenericSpecializationPartCreationInfo = "System.ComponentModel.Composition.ReflectionModel.GenericSpecializationPartCreationInfo";
+        private const string TYPE_KVP_String_AssemblyCatalog = "System.Collections.Generic.Dictionary+Entry<System.String,System.ComponentModel.Composition.Hosting.AssemblyCatalog>[]";
+        private const string TYPE_KVP_String_Object = "System.Collections.Generic.Dictionary+Entry<System.String,System.Object>[]";
+        private const string TYPE_ReflectionComposablePart = "System.ComponentModel.Composition.ReflectionModel.ReflectionComposablePart";
+        private const string TYPE_SingleExportComposablePart = "System.ComponentModel.Composition.Hosting.CompositionBatch+SingleExportComposablePart";
 
-        private static string TYPE_ApplicationCatalog = "System.ComponentModel.Composition.Hosting.ApplicationCatalog";
-        private static string TYPE_AggregateCatalog = "System.ComponentModel.Composition.Hosting.AggregateCatalog";
-        private static string TYPE_DirectoryCatalog = "System.ComponentModel.Composition.Hosting.DirectoryCatalog";
-        private static string TYPE_AssemblyCatalog = "System.ComponentModel.Composition.Hosting.AssemblyCatalog";
-        private static string TYPE_TypeCatalog = "System.ComponentModel.Composition.Hosting.TypeCatalog";
-        private static string TYPE_FilteredCatalog = "System.ComponentModel.Composition.Hosting.FilteredCatalog";
-
-        //System.ComponentModel.Composition.Hosting.ApplicationCatalog => "_innerCatalog" => link to AggregateCatalog
-        //System.ComponentModel.Composition.Hosting.AggregateCatalog => "_catalogs", "_catalogs", "_items" => this includes 'n' other catalogs 
-        //System.ComponentModel.Composition.Hosting.DirectoryCatalog => "_assemblyCatalogs", "entries" => kvp(filepath, AssemblyCatalog)
-        //System.ComponentModel.Composition.Hosting.AssemblyCatalog => "_innerCatalog" => link to TypeCatalogs 
-        //System.ComponentModel.Composition.Hosting.TypeCatalog => "_parts", "_items"
-        //System.ComponentModel.Composition.Hosting.FilteredCatalog => "_innerCatalog" => link to any ComposablePartCatalog
-
-        private static Dictionary<string, Action<ClrHeap, ulong, HashSet<ulong>>> CatalogActionMappings = new Dictionary<string, Action<ClrHeap, ulong, HashSet<ulong>>>
+        private const string TYPE_ApplicationCatalog = "System.ComponentModel.Composition.Hosting.ApplicationCatalog";
+        private const string TYPE_AggregateCatalog = "System.ComponentModel.Composition.Hosting.AggregateCatalog";
+        private const string TYPE_DirectoryCatalog = "System.ComponentModel.Composition.Hosting.DirectoryCatalog";
+        private const string TYPE_AssemblyCatalog = "System.ComponentModel.Composition.Hosting.AssemblyCatalog";
+        private const string TYPE_TypeCatalog = "System.ComponentModel.Composition.Hosting.TypeCatalog";
+        private const string TYPE_FilteredCatalog = "System.ComponentModel.Composition.Hosting.FilteredCatalog";
+        
+        private static readonly Dictionary<string, Action<ClrHeap, ulong, HashSet<ulong>>> CatalogActionMappings = new Dictionary<string, Action<ClrHeap, ulong, HashSet<ulong>>>
         {
             { TYPE_FilteredCatalog, ProcessFilteredCatalog },
             { TYPE_ApplicationCatalog, ProcessApplicationCatalog },
@@ -465,7 +451,7 @@ namespace MefDumper
             { TYPE_TypeCatalog, ProcessTypeCatalog }
         };
 
-        private static Dictionary<string, Func<ClrHeap, ulong, string>> PartCreationInfoActionMappings = new Dictionary<string, Func<ClrHeap, ulong, string>>
+        private static readonly Dictionary<string, Func<ClrHeap, ulong, string>> PartCreationInfoActionMappings = new Dictionary<string, Func<ClrHeap, ulong, string>>
         {
             { TYPE_AttributedPartCreationInfo, ProcessAttributedPartCreationInfo },
             { TYPE_GenericSpecializationPartCreationInfo, ProcessGenericSpecializationPartCreationInfo }
