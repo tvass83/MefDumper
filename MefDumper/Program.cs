@@ -15,84 +15,100 @@ namespace MefDumper
     {
         static void Main(string[] args)
         {
-            var retCode = ArgParser.Parse(args, new string[] { }, new string[] { "-a", "-d", "-pid" });
+            var retCode = ArgParser.Parse(args, new string[] { "-h", "-?", "/?" }, new string[] { "-a", "-d", "-pid" });
 
-            ValidateArguments();
+            ValidateArguments(retCode);
+            
+            string switchArg = ArgParser.Switches.FirstOrDefault();
 
-            if (retCode == ErrorCode.Success)
+            if (switchArg != null)
             {
-                if (ArgParser.SwitchesWithValues.ContainsKey("-a"))
+                switch (switchArg)
                 {
-                    var assemblies = ArgParser.SwitchesWithValues["-a"].Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var assembly in assemblies)
+                    case "-h":
+                    case "-?":
+                    case "/?":
                     {
-                        ValidateFile(assembly);
+                        PrintSyntaxAndExit(retCode);
+                        break;
                     }
-
-                    var aggrCat = new AggregateCatalog(assemblies.Select(x => new AssemblyCatalog(x)));
-
-                    var RESULT = new List<ReflectionComposablePart>();
-
-                    using (var container = new CompositionContainer(aggrCat))
-                    {
-                        foreach (var part in container.Catalog.Parts)
-                        {
-                            var rfc = new ReflectionComposablePart();
-                            rfc.TypeName = part.ToString();
-
-                            foreach (var import in part.ImportDefinitions)
-                            {
-                                var impDef = new ImportDefinition();
-                                impDef.ContractName = import.ContractName;
-
-                                var s = import.ToString().Split(new string[] { "\n\t" }, StringSplitOptions.RemoveEmptyEntries);
-                                impDef.RequiredTypeIdentity = s[1].Substring(s[1].IndexOf("\t") + 1);
-                                rfc.Imports.Add(impDef);
-                            }
-
-                            foreach (var export in part.ExportDefinitions)
-                            {
-                                var expDef = new ExportDefinition();
-                                expDef.ContractName = export.ContractName;
-                                expDef.TypeIdentity = (string)export.Metadata[CONST_ExportTypeIdentity];
-                                rfc.Exports.Add(expDef);
-                            }
-
-                            RESULT.Add(rfc);
-                        }
-                    }
-
-                    DgmlHelper.CreateDgml($"d:\\temp\\dgml\\{Guid.NewGuid().ToString()}.dgml", RESULT);
-                }
-                else if (ArgParser.SwitchesWithValues.ContainsKey("-d"))
-                {
-                    string dumpFile = ArgParser.SwitchesWithValues["-d"];
-                    ValidateFile(dumpFile);
-
-                    var wrapper = ClrMdHelper.LoadDumpFile(dumpFile);
-                    InitAndStartProcessing(wrapper);
-                }
-                else if (ArgParser.SwitchesWithValues.ContainsKey("-pid"))
-                {
-                    if (int.TryParse(ArgParser.SwitchesWithValues["-pid"], out int pid))
-                    {
-                        var wrapper = ClrMdHelper.AttachToLiveProcess(pid);
-                        InitAndStartProcessing(wrapper);
-                    }
-                    else
-                    {
-                        Console.WriteLine($"ERROR: Invalid process id.");
-                        Environment.Exit(1);
-                    }
-                }
-                else
-                {
-                    PrintSyntaxAndExit(retCode);
                 }
             }
-            else
+
+            var kvp = ArgParser.SwitchesWithValues.FirstOrDefault();
+
+            if (!kvp.Equals(default(KeyValuePair<string, string>)))
             {
-                PrintSyntaxAndExit(retCode);
+                switch (kvp.Key)
+                {
+                    case "-a":
+                    {
+                        var assemblies = kvp.Value.Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var assembly in assemblies)
+                        {
+                            ValidateFile(assembly);
+                        }
+
+                        var aggrCat = new AggregateCatalog(assemblies.Select(x => new AssemblyCatalog(x)));
+
+                        var RESULT = new List<ReflectionComposablePart>();
+
+                        using (var container = new CompositionContainer(aggrCat))
+                        {
+                            foreach (var part in container.Catalog.Parts)
+                            {
+                                var rfc = new ReflectionComposablePart();
+                                rfc.TypeName = part.ToString();
+
+                                foreach (var import in part.ImportDefinitions)
+                                {
+                                    var impDef = new ImportDefinition();
+                                    impDef.ContractName = import.ContractName;
+
+                                    var s = import.ToString().Split(new string[] { "\n\t" }, StringSplitOptions.RemoveEmptyEntries);
+                                    impDef.RequiredTypeIdentity = s[1].Substring(s[1].IndexOf("\t") + 1);
+                                    rfc.Imports.Add(impDef);
+                                }
+
+                                foreach (var export in part.ExportDefinitions)
+                                {
+                                    var expDef = new ExportDefinition();
+                                    expDef.ContractName = export.ContractName;
+                                    expDef.TypeIdentity = (string)export.Metadata[CONST_ExportTypeIdentity];
+                                    rfc.Exports.Add(expDef);
+                                }
+
+                                RESULT.Add(rfc);
+                            }
+                        }
+
+                        DgmlHelper.CreateDgml($"d:\\temp\\dgml\\{Guid.NewGuid().ToString()}.dgml", RESULT);
+                        break;
+                    }
+                    case "-d":
+                    {
+                        string dumpFile = kvp.Value;
+                        ValidateFile(dumpFile);
+
+                        var wrapper = ClrMdHelper.LoadDumpFile(dumpFile);
+                        InitAndStartProcessing(wrapper);
+                        break;
+                    }
+                    case "-pid":
+                    {
+                        if (int.TryParse(kvp.Value, out int pid))
+                        {
+                            var wrapper = ClrMdHelper.AttachToLiveProcess(pid);
+                            InitAndStartProcessing(wrapper);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"ERROR: Invalid process id.");
+                            Environment.Exit(1);
+                        }
+                        break;
+                    }
+                }
             }
         }
 
@@ -108,9 +124,35 @@ namespace MefDumper
             wrapper.Process();
         }
 
-        private static void ValidateArguments()
+        private static void ValidateArguments(ErrorCode errorCode)
         {
-            //TODO: validate various combinations
+            if (errorCode != ErrorCode.Success)
+            {
+                PrintSyntaxAndExit(errorCode);
+            }
+
+            if (ArgParser.OrdinaryArguments.Any())
+            {
+                foreach (var arg in ArgParser.OrdinaryArguments)
+                {
+                    Console.WriteLine($"ERROR: Unexpected argument: {arg}");
+                }
+
+                PrintSyntaxAndExit(errorCode);
+            }
+
+            var switchesWithValues = ArgParser.SwitchesWithValues;
+            var switches = ArgParser.Switches;
+
+            if (switchesWithValues.Count > 1 || switches.Count > 1)
+            {
+                PrintSyntaxAndExit(errorCode);
+            }
+
+            if (switchesWithValues.Any() && switches.Any())
+            {
+                PrintSyntaxAndExit(errorCode);
+            }
         }
 
         private static void ValidateFile(string path)
@@ -133,9 +175,11 @@ namespace MefDumper
             }
 
             Console.WriteLine("Usage:");
+            Console.WriteLine("MefDumper -a assembly1[;assembly2;...;assemblyN]");
+            Console.WriteLine(" OR");
             Console.WriteLine("MefDumper -d dumpfile");
             Console.WriteLine(" OR");
-            Console.WriteLine("MefDumper -a assembly1[;assembly2;...;assemblyN]");
+            Console.WriteLine("MefDumper -pid processId");
 
             Environment.Exit(1);
         }
@@ -200,9 +244,9 @@ namespace MefDumper
                             break;
                         }
                     }
-                    
+
                     var rcp = new ReflectionComposablePart();
-                    rcp.TypeName = isCreated ? exportedValueTypeName : typeId;                    
+                    rcp.TypeName = isCreated ? exportedValueTypeName : typeId;
                     rcp.IsCreated = isCreated;
                     rcp.Exports.Add(new ExportDefinition() { ContractName = contract, TypeIdentity = typeId });
 
@@ -222,7 +266,7 @@ namespace MefDumper
                 ulong catalogFieldValue = ClrMdHelper.GetObjectAs<ulong>(heap, catalogExProvider, FIELD_Catalog);
                 HashSet<ulong> parts = new HashSet<ulong>();
 
-                InvokeCatalogHandler(heap, catalogFieldValue, parts);                                
+                InvokeCatalogHandler(heap, catalogFieldValue, parts);
 
                 foreach (var part in parts)
                 {
@@ -247,7 +291,7 @@ namespace MefDumper
                 {
                     ulong partCreationInfo = ClrMdHelper.GetObjectAs<ulong>(heap, activePart.key, FIELD_CreationInfo);
                     string partType = InvokePartCreationInfoHandler(heap, partCreationInfo);
-                    activatedPartNames.Add(partType);                    
+                    activatedPartNames.Add(partType);
                 }
 
                 foreach (var rcp in RESULT)
@@ -388,7 +432,7 @@ namespace MefDumper
             ClrType creationInfoObjType = heap.GetObjectType(creationInfoObj);
             return creationInfoObjType.GetRuntimeType(creationInfoObj)?.Name ?? creationInfoObjType.Name;
         }
-                
+
         private static string ProcessGenericSpecializationPartCreationInfo(ClrHeap heap, ulong partCreationInfo)
         {
             ulong creationInfoObj = ClrMdHelper.GetObjectAs<ulong>(heap, partCreationInfo, FIELD_OriginalPartCreationInfo);
@@ -455,7 +499,7 @@ namespace MefDumper
         private const string TYPE_AssemblyCatalog = "System.ComponentModel.Composition.Hosting.AssemblyCatalog";
         private const string TYPE_TypeCatalog = "System.ComponentModel.Composition.Hosting.TypeCatalog";
         private const string TYPE_FilteredCatalog = "System.ComponentModel.Composition.Hosting.FilteredCatalog";
-        
+
         private static readonly Dictionary<string, Action<ClrHeap, ulong, HashSet<ulong>>> CatalogActionMappings = new Dictionary<string, Action<ClrHeap, ulong, HashSet<ulong>>>
         {
             { TYPE_FilteredCatalog, ProcessFilteredCatalog },
