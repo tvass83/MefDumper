@@ -183,9 +183,9 @@ namespace MefDumper
 
             Environment.Exit(1);
         }
-
+                
         private static void DumpTypes(ClrHeap heap, ulong obj, string type)
-        {
+        {            
             Console.WriteLine($"Dumping CompositionContainer @{obj:X}");
 
             // Check if custom ExportProviders are present
@@ -229,8 +229,14 @@ namespace MefDumper
                     ulong export = ClrMdHelper.GetObjectAs<ulong>(heap, composablePart, FIELD_Export);
                     ulong exportedValue = ClrMdHelper.GetObjectAs<ulong>(heap, export, FIELD_ExportedValue);
                     string exportedValueTypeName = exportedValue != 0 ? heap.GetObjectType(exportedValue).Name : null;
-                    bool isCreated = exportedValueTypeName != null && (exportedValueTypeName != typeof(object).FullName);
+                    bool isCached = exportedValueTypeName != typeof(object).FullName;
 
+                    if (!isCached)
+                    {
+                        ulong realExportedValue = ClrMdHelper.GetLastObjectInHierarchy(heap, export, HIERARCHY_Func_To_ExportedValue, 0);
+                        exportedValueTypeName = heap.GetObjectType(realExportedValue).Name;
+                    }
+                    
                     var exportDefinition = ClrMdHelper.GetObjectAs<ulong>(heap, export, FIELD_Definition);
                     string contract = ClrMdHelper.GetObjectAs<string>(heap, exportDefinition, FIELD_ContractName);
                     var metadata = ClrMdHelper.GetLastObjectInHierarchyAsKVPs(heap, exportDefinition, HIERARCHY_ExportDefinition_To_Metadata, 0, TYPE_KVP_String_Object);
@@ -246,8 +252,8 @@ namespace MefDumper
                     }
 
                     var rcp = new ReflectionComposablePart();
-                    rcp.TypeName = isCreated ? exportedValueTypeName : typeId;
-                    rcp.IsCreated = isCreated;
+                    rcp.TypeName = exportedValueTypeName;
+                    rcp.IsCreated = true;
                     rcp.Exports.Add(new ExportDefinition() { ContractName = contract, TypeIdentity = typeId });
 
                     RESULT.Add(rcp);
@@ -473,6 +479,7 @@ namespace MefDumper
         private static readonly string[] HIERARCHY_PrismDefaultsCatalog_To_ComposablePartDefinitions = new string[] { "parts", "_items" };
         private static readonly string[] HIERARCHY_ReflectionComposablePartDefinition_To_AttributedPartCreationInfo = new string[] { "_creationInfo", "_type" };
         private static readonly string[] HIERARCHY_TypeCatalog_To_ComposablePartDefinitions = new string[] { "_parts", "_items" };
+        private static readonly string[] HIERARCHY_Func_To_ExportedValue = new string[] { "_exportedValueGetter", "_target", "exportedValue" };
 
         private const string CONST_ExportTypeIdentity = "ExportTypeIdentity";
         private const string FIELD_Catalog = "_catalog";
