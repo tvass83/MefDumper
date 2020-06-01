@@ -7,7 +7,7 @@ namespace MefDumper.Helpers
 {
     public static class DgmlHelper
     {
-        public static void CreateDgml(string path, List<ReflectionComposablePart> parts)
+        public static void CreateDgml(string path, IEnumerable<ReflectionComposablePart> parts)
         {
             var settings = new XmlWriterSettings();
             settings.ConformanceLevel = ConformanceLevel.Document;

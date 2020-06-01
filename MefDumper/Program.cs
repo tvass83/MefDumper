@@ -82,7 +82,7 @@ namespace MefDumper
                             }
                         }
 
-                        DgmlHelper.CreateDgml($"d:\\temp\\dgml\\{Guid.NewGuid().ToString()}.dgml", RESULT);
+                        DgmlHelper.CreateDgml($"{Guid.NewGuid().ToString()}.dgml", RESULT);
                         break;
                     }
                     case "-d":
@@ -185,7 +185,7 @@ namespace MefDumper
         }
                 
         private static void DumpTypes(ClrHeap heap, ulong obj, string type)
-        {            
+        {
             Console.WriteLine($"Dumping CompositionContainer @{obj:X}");
 
             // Check if custom ExportProviders are present
@@ -208,7 +208,7 @@ namespace MefDumper
                 }
             }
 
-            var RESULT = new List<ReflectionComposablePart>();
+            var RESULT = new Dictionary<string, ReflectionComposablePart>();
 
             // Get ComposablePart[] from ComposablePartExportProvider
             List<ulong> composableParts = ClrMdHelper.GetLastObjectInHierarchyAsArray(heap, obj, HIERARCHY_CompositionContainer_To_ComposableParts, 0, TYPE_ComposablePart);
@@ -222,19 +222,23 @@ namespace MefDumper
                     var rcpDef = ClrMdHelper.GetObjectAs<ulong>(heap, composablePart, FIELD_Definition);
                     var rcp = ProcessReflectionComposablePartDefinition(heap, rcpDef);
                     rcp.IsCreated = true;
-                    RESULT.Add(rcp);
+                    MergeResults(RESULT, rcp);
                 }
                 else if (composablePartTypeName == TYPE_SingleExportComposablePart)
                 {
                     ulong export = ClrMdHelper.GetObjectAs<ulong>(heap, composablePart, FIELD_Export);
                     ulong exportedValue = ClrMdHelper.GetObjectAs<ulong>(heap, export, FIELD_ExportedValue);
                     string exportedValueTypeName = exportedValue != 0 ? heap.GetObjectType(exportedValue).Name : null;
-                    bool isCached = exportedValueTypeName != typeof(object).FullName;
+                    bool isCached = exportedValue != 0 && exportedValueTypeName != typeof(object).FullName;
 
                     if (!isCached)
                     {
                         ulong realExportedValue = ClrMdHelper.GetLastObjectInHierarchy(heap, export, HIERARCHY_Func_To_ExportedValue, 0);
-                        exportedValueTypeName = heap.GetObjectType(realExportedValue).Name;
+                        
+                        if (realExportedValue != 0)
+                        {
+                            exportedValueTypeName = heap.GetObjectType(realExportedValue).Name;
+                        }
                     }
                     
                     var exportDefinition = ClrMdHelper.GetObjectAs<ulong>(heap, export, FIELD_Definition);
@@ -252,11 +256,11 @@ namespace MefDumper
                     }
 
                     var rcp = new ReflectionComposablePart();
-                    rcp.TypeName = exportedValueTypeName;
+                    rcp.TypeName = exportedValueTypeName ?? typeId;
                     rcp.IsCreated = true;
                     rcp.Exports.Add(new ExportDefinition() { ContractName = contract, TypeIdentity = typeId });
 
-                    RESULT.Add(rcp);
+                    MergeResults(RESULT, rcp);
                 }
                 else
                 {
@@ -277,14 +281,13 @@ namespace MefDumper
                 foreach (var part in parts)
                 {
                     var rcp = ProcessReflectionComposablePartDefinition(heap, part);
-
-                    RESULT.Add(rcp);
+                    MergeResults(RESULT, rcp);
                 }
 
                 Console.WriteLine($"{RESULT.Count} parts were found: ");
-                foreach (var part in RESULT)
+                foreach (var part in RESULT.Keys)
                 {
-                    Console.WriteLine($"\t{part.TypeName}");
+                    Console.WriteLine($"\t{part}");
                 }
 
                 Console.WriteLine();
@@ -302,13 +305,58 @@ namespace MefDumper
 
                 foreach (var rcp in RESULT)
                 {
-                    if (activatedPartNames.Contains(rcp.TypeName))
+                    if (activatedPartNames.Contains(rcp.Key))
                     {
-                        rcp.IsCreated = true;
+                        rcp.Value.IsCreated = true;
                     }
                 }
 
-                DgmlHelper.CreateDgml($"d:\\temp\\dgml\\{obj:X}.dgml", RESULT);
+                DgmlHelper.CreateDgml($"{obj:X}.dgml", RESULT.Select(x=>x.Value));
+            }
+        }
+
+        private static void MergeResults(Dictionary<string, ReflectionComposablePart> container, ReflectionComposablePart rcp)
+        {
+            if (container.ContainsKey(rcp.TypeName))
+            {
+                var rcpInContainer = container[rcp.TypeName];
+                if (!rcpInContainer.IsCreated)
+                {
+                    rcpInContainer.IsCreated = rcp.IsCreated;
+                }
+
+                var importsToAdd = new List<ImportDefinition>();
+                foreach (var import in rcp.Imports)
+                {
+                    if (!rcpInContainer.Imports.Contains(import, ImportDefinitionComparer.Instance))
+                    {
+                        importsToAdd.Add(import);
+                    }
+                }
+
+                if (importsToAdd.Any())
+                {
+                    rcpInContainer.Imports.AddRange(importsToAdd);
+                }
+
+                var exportsToAdd = new List<ExportDefinition>();
+                foreach (var export in rcp.Exports)
+                {
+                    if (!rcpInContainer.Exports.Contains(export, ExportDefinitionComparer.Instance))
+                    {
+                        exportsToAdd.Add(export);
+                    }
+                }
+
+                if (exportsToAdd.Any())
+                {
+                    rcpInContainer.Exports.AddRange(exportsToAdd);
+                }
+
+            }
+            else
+            {
+                container[rcp.TypeName] = rcp;
             }
         }
 
@@ -348,14 +396,19 @@ namespace MefDumper
                     string contract = ClrMdHelper.GetObjectAs<string>(heap, attrExpDef, FIELD_ContractName);
                     ulong typeObj = ClrMdHelper.GetObjectAs<ulong>(heap, attrExpDef, FIELD_TypeIdentityType);
 
+                    string typename = null;
+
                     if (typeObj == 0)
                     {
                         Console.WriteLine($"WARNING: Special export was found with no type identity (contract: {contract})");
-                        continue;
+                        typename = rcp.TypeName;
+                    }
+                    else
+                    {
+                        ClrType typeObjType = heap.GetObjectType(typeObj);
+                        typename = typeObjType.GetRuntimeType(typeObj)?.Name ?? typeObjType.Name;
                     }
 
-                    ClrType typeObjType = heap.GetObjectType(typeObj);
-                    string typename = typeObjType.GetRuntimeType(typeObj)?.Name ?? typeObjType.Name;
                     rcp.Exports.Add(new ExportDefinition() { ContractName = contract, TypeIdentity = typename });
                 }
             }
