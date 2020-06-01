@@ -412,6 +412,17 @@ namespace MefDumper
             }
         }
 
+        private static void ProcessPrismDefaultsCatalog(ClrHeap heap, ulong prismCat, HashSet<ulong> parts)
+        {
+            // Get all auto-created partdescriptions (ComposablePartDefinition[])
+            List<ulong> partObjs = ClrMdHelper.GetLastObjectInHierarchyAsArray(heap, prismCat, HIERARCHY_PrismDefaultsCatalog_To_ComposablePartDefinitions, 0, TYPE_ComposablePartDefinitionArray);
+
+            foreach (var partObj in partObjs)
+            {
+                parts.Add(partObj);
+            }
+        }
+
         private static void InvokeCatalogHandler(ClrHeap heap, ulong composablePartCatalog, HashSet<ulong> parts)
         {
             string catalogType = heap.GetObjectType(composablePartCatalog).Name;
@@ -459,6 +470,7 @@ namespace MefDumper
         private static readonly string[] HIERARCHY_CompositionContainer_To_ComposableParts = new string[] { "_partExportProvider", "_parts", "_items" };
         private static readonly string[] HIERARCHY_DirectoryCatalog_To_AssemblyCatalogs = new string[] { "_assemblyCatalogs", "entries" };
         private static readonly string[] HIERARCHY_ExportDefinition_To_Metadata = new string[] { "_metadata", "m_dictionary", "entries" };
+        private static readonly string[] HIERARCHY_PrismDefaultsCatalog_To_ComposablePartDefinitions = new string[] { "parts", "_items" };
         private static readonly string[] HIERARCHY_ReflectionComposablePartDefinition_To_AttributedPartCreationInfo = new string[] { "_creationInfo", "_type" };
         private static readonly string[] HIERARCHY_TypeCatalog_To_ComposablePartDefinitions = new string[] { "_parts", "_items" };
 
@@ -493,12 +505,13 @@ namespace MefDumper
         private const string TYPE_ReflectionComposablePart = "System.ComponentModel.Composition.ReflectionModel.ReflectionComposablePart";
         private const string TYPE_SingleExportComposablePart = "System.ComponentModel.Composition.Hosting.CompositionBatch+SingleExportComposablePart";
 
-        private const string TYPE_ApplicationCatalog = "System.ComponentModel.Composition.Hosting.ApplicationCatalog";
         private const string TYPE_AggregateCatalog = "System.ComponentModel.Composition.Hosting.AggregateCatalog";
-        private const string TYPE_DirectoryCatalog = "System.ComponentModel.Composition.Hosting.DirectoryCatalog";
+        private const string TYPE_ApplicationCatalog = "System.ComponentModel.Composition.Hosting.ApplicationCatalog";
         private const string TYPE_AssemblyCatalog = "System.ComponentModel.Composition.Hosting.AssemblyCatalog";
-        private const string TYPE_TypeCatalog = "System.ComponentModel.Composition.Hosting.TypeCatalog";
+        private const string TYPE_DirectoryCatalog = "System.ComponentModel.Composition.Hosting.DirectoryCatalog";
         private const string TYPE_FilteredCatalog = "System.ComponentModel.Composition.Hosting.FilteredCatalog";
+        private const string TYPE_PrismDefaultsCatalog = "Prism.Mef.PrismDefaultsCatalog";
+        private const string TYPE_TypeCatalog = "System.ComponentModel.Composition.Hosting.TypeCatalog";
 
         private static readonly Dictionary<string, Action<ClrHeap, ulong, HashSet<ulong>>> CatalogActionMappings = new Dictionary<string, Action<ClrHeap, ulong, HashSet<ulong>>>
         {
@@ -507,7 +520,8 @@ namespace MefDumper
             { TYPE_AggregateCatalog, ProcessAggregateCatalog },
             { TYPE_DirectoryCatalog, ProcessDirectoryCatalog },
             { TYPE_AssemblyCatalog, ProcessAssemblyCatalog },
-            { TYPE_TypeCatalog, ProcessTypeCatalog }
+            { TYPE_TypeCatalog, ProcessTypeCatalog },
+            { TYPE_PrismDefaultsCatalog, ProcessPrismDefaultsCatalog }
         };
 
         private static readonly Dictionary<string, Func<ClrHeap, ulong, string>> PartCreationInfoActionMappings = new Dictionary<string, Func<ClrHeap, ulong, string>>
