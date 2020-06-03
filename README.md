@@ -14,7 +14,7 @@ MefDumper -a test.dll[;test2.dll;...;testN.dll]
 
 In this scenario, MefDumper extracts additional information compared to the previous scenario. These are:
 
-* Parts that have been instantiated
+* Parts that have been instantiated (green boxes)
 * Objects that were put into the container directly, via APIs like ComposeExportedValue (see Limitations)
 * The type names of custom ExportProviders
 
@@ -51,4 +51,4 @@ MefDumper -pid <processId>
 #### Displaying directed graphs
 Graph drawing and visualization is an extremely complex topic. (See this [handbook](http://cs.brown.edu/people/rtamassi/gdhandbook/) for a glimpse). That's why MefDumper creates [Directed Graph Markup Language (DGML)](https://docs.microsoft.com/en-us/visualstudio/modeling/directed-graph-markup-language-dgml-reference?view=vs-2019) files so that it can utilize the existing tooling out there. 
 
-All Visual Studio editions from VS2017 and onward [ship](https://docs.microsoft.com/en-us/visualstudio/modeling/what-s-new-for-design-in-visual-studio?view=vs-2017#edition-support-for-architecture-and-modeling-tools) with a powerful DGML editor/viewer that you might need to install from the Visual Studio installer "Individual components" tab.
+I'd recommend using the DGML editor that [ships with Visual Studio 2017+](https://docs.microsoft.com/en-us/visualstudio/modeling/what-s-new-for-design-in-visual-studio?view=vs-2017#edition-support-for-architecture-and-modeling-tools). (You might have to install it from the Visual Studio installer "Individual components" tab.)

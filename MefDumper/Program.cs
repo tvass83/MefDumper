@@ -359,7 +359,7 @@ namespace MefDumper
                 container[rcp.TypeName] = rcp;
             }
         }
-
+                
         private static ReflectionComposablePart ProcessReflectionComposablePartDefinition(ClrHeap heap, ulong part)
         {
             var rcp = new ReflectionComposablePart();
@@ -368,19 +368,13 @@ namespace MefDumper
             ClrType creationInfoObjType = heap.GetObjectType(creationInfoObj);
             rcp.TypeName = creationInfoObjType.GetRuntimeType(creationInfoObj)?.Name ?? creationInfoObjType.Name;
 
-            // Get ImportDefinition[]
-            ulong importArrayObj = ClrMdHelper.GetObjectAs<ulong>(heap, part, FIELD_Imports);
+            var importObjs = ClrMdHelper.GetLastObjectInHierarchyAsArray(heap, part, HIERARCHY_CreationInfo_To_ImportArray, 0, TYPE_ImportDefinitionArray);
 
-            if (importArrayObj != 0)
+            foreach (var importDef in importObjs)
             {
-                List<ulong> importObjs = ClrMdHelper.GetArrayItems(heap.GetObjectType(importArrayObj), importArrayObj);
-
-                foreach (var importDef in importObjs)
-                {
-                    string contract = ClrMdHelper.GetObjectAs<string>(heap, importDef, FIELD_ContractName);
-                    string typeId = ClrMdHelper.GetObjectAs<string>(heap, importDef, FIELD_RequiredTypeIdentity);
-                    rcp.Imports.Add(new ImportDefinition() { ContractName = contract, RequiredTypeIdentity = typeId });
-                }
+                string contract = ClrMdHelper.GetObjectAs<string>(heap, importDef, FIELD_ContractName);
+                string typeId = ClrMdHelper.GetObjectAs<string>(heap, importDef, FIELD_RequiredTypeIdentity);
+                rcp.Imports.Add(new ImportDefinition() { ContractName = contract, RequiredTypeIdentity = typeId });
             }
 
             // Get ExportDefinition[]
@@ -527,6 +521,7 @@ namespace MefDumper
         private static readonly string[] HIERARCHY_AggregateCatalog_To_ComposablePartCatalogs = new string[] { "_catalogs", "_catalogs", "_items" };
         private static readonly string[] HIERARCHY_CatalogExportProvider_To_Activated = new string[] { "_activatedParts", "entries" };
         private static readonly string[] HIERARCHY_CompositionContainer_To_ComposableParts = new string[] { "_partExportProvider", "_parts", "_items" };
+        private static readonly string[] HIERARCHY_CreationInfo_To_ImportArray = new string[] { "_creationInfo", "_imports", "_items" };
         private static readonly string[] HIERARCHY_DirectoryCatalog_To_AssemblyCatalogs = new string[] { "_assemblyCatalogs", "entries" };
         private static readonly string[] HIERARCHY_ExportDefinition_To_Metadata = new string[] { "_metadata", "m_dictionary", "entries" };
         private static readonly string[] HIERARCHY_PrismDefaultsCatalog_To_ComposablePartDefinitions = new string[] { "parts", "_items" };
@@ -560,6 +555,7 @@ namespace MefDumper
         private const string TYPE_ComposablePartDefinitionArray2 = "System.Collections.Generic.Dictionary+Entry<System.ComponentModel.Composition.Primitives.ComposablePartDefinition,System.ComponentModel.Composition.Hosting.CatalogExportProvider+CatalogPart>[]";
         private const string TYPE_CompositionContainer = "System.ComponentModel.Composition.Hosting.CompositionContainer";
         private const string TYPE_GenericSpecializationPartCreationInfo = "System.ComponentModel.Composition.ReflectionModel.GenericSpecializationPartCreationInfo";
+        private const string TYPE_ImportDefinitionArray = "System.ComponentModel.Composition.Primitives.ImportDefinition[]";
         private const string TYPE_KVP_String_AssemblyCatalog = "System.Collections.Generic.Dictionary+Entry<System.String,System.ComponentModel.Composition.Hosting.AssemblyCatalog>[]";
         private const string TYPE_KVP_String_Object = "System.Collections.Generic.Dictionary+Entry<System.String,System.Object>[]";
         private const string TYPE_ReflectionComposablePart = "System.ComponentModel.Composition.ReflectionModel.ReflectionComposablePart";
