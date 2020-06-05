@@ -63,9 +63,8 @@ namespace MefDumper
                                 foreach (var import in part.ImportDefinitions)
                                 {
                                     var impDef = new ImportDefinition();
-                                    impDef.ContractName = import.ContractName;
-
-                                    var s = import.ToString().Split(new string[] { "\n\t" }, StringSplitOptions.RemoveEmptyEntries);
+                                    string[] s = ParseImportDefinition(import.ToString());
+                                    impDef.ContractName = s[0].Substring(s[0].IndexOf("\t") + 1);
                                     impDef.RequiredTypeIdentity = s[1].Substring(s[1].IndexOf("\t") + 1);
                                     rfc.Imports.Add(impDef);
                                 }
@@ -110,6 +109,12 @@ namespace MefDumper
                     }
                 }
             }
+        }
+
+        private static string[] ParseImportDefinition(string import)
+        {
+            var slice = import.Substring(import.IndexOf("Contract"));
+            return slice.Split(new string[] { "\n\t" }, StringSplitOptions.RemoveEmptyEntries);
         }
 
         private static void InitAndStartProcessing(DataTargetWrapper wrapper)
@@ -209,62 +214,68 @@ namespace MefDumper
             }
 
             var RESULT = new Dictionary<string, ReflectionComposablePart>();
-
-            // Get ComposablePart[] from ComposablePartExportProvider
-            List<ulong> composableParts = ClrMdHelper.GetLastObjectInHierarchyAsArray(heap, obj, HIERARCHY_CompositionContainer_To_ComposableParts, 0, TYPE_ComposablePart);
-
-            foreach (var composablePart in composableParts)
-            {
-                string composablePartTypeName = heap.GetObjectType(composablePart).Name;
-
-                if (composablePartTypeName == TYPE_ReflectionComposablePart)
-                {
-                    var rcpDef = ClrMdHelper.GetObjectAs<ulong>(heap, composablePart, FIELD_Definition);
-                    var rcp = ProcessReflectionComposablePartDefinition(heap, rcpDef);
-                    rcp.IsCreated = true;
-                    MergeResults(RESULT, rcp);
-                }
-                else if (composablePartTypeName == TYPE_SingleExportComposablePart)
-                {
-                    ulong export = ClrMdHelper.GetObjectAs<ulong>(heap, composablePart, FIELD_Export);
-                    ulong exportedValue = ClrMdHelper.GetObjectAs<ulong>(heap, export, FIELD_ExportedValue);
-                    string exportedValueTypeName = exportedValue != 0 ? heap.GetObjectType(exportedValue).Name : null;
-                    bool isCached = exportedValue != 0 && exportedValueTypeName != typeof(object).FullName;
-
-                    if (!isCached)
-                    {
-                        ulong realExportedValue = ClrMdHelper.GetLastObjectInHierarchy(heap, export, HIERARCHY_Func_To_ExportedValue, 0);
                         
-                        if (realExportedValue != 0)
-                        {
-                            exportedValueTypeName = heap.GetObjectType(realExportedValue).Name;
-                        }
-                    }
-                    
-                    var exportDefinition = ClrMdHelper.GetObjectAs<ulong>(heap, export, FIELD_Definition);
-                    string contract = ClrMdHelper.GetObjectAs<string>(heap, exportDefinition, FIELD_ContractName);
-                    var metadata = ClrMdHelper.GetLastObjectInHierarchyAsKVPs(heap, exportDefinition, HIERARCHY_ExportDefinition_To_Metadata, 0, TYPE_KVP_String_Object);
-                    string typeId = "";
+            // Check if there exists a PartExportProvider
+            ulong partExportProvider = ClrMdHelper.GetObjectAs<ulong>(heap, obj, FIELD_PartExportProvider);
 
-                    foreach (var entry in metadata)
-                    {
-                        if (ClrMdHelper.GetStringContents(heap, entry.key) == CONST_ExportTypeIdentity)
-                        {
-                            typeId = ClrMdHelper.GetStringContents(heap, entry.value);
-                            break;
-                        }
-                    }
+            if (partExportProvider != 0)
+            {
+                // Get ComposablePart[] from ComposablePartExportProvider
+                List<ulong> composableParts = ClrMdHelper.GetLastObjectInHierarchyAsArray(heap, partExportProvider, HIERARCHY_PartExportProvider_To_ComposableParts, 0, TYPE_ComposablePart);
 
-                    var rcp = new ReflectionComposablePart();
-                    rcp.TypeName = exportedValueTypeName ?? typeId;
-                    rcp.IsCreated = true;
-                    rcp.Exports.Add(new ExportDefinition() { ContractName = contract, TypeIdentity = typeId });
-
-                    MergeResults(RESULT, rcp);
-                }
-                else
+                foreach (var composablePart in composableParts)
                 {
-                    Console.WriteLine($"WARNING: Unsupported ComposablePart was found: {composablePartTypeName}");
+                    string composablePartTypeName = heap.GetObjectType(composablePart).Name;
+
+                    if (composablePartTypeName == TYPE_ReflectionComposablePart)
+                    {
+                        var rcpDef = ClrMdHelper.GetObjectAs<ulong>(heap, composablePart, FIELD_Definition);
+                        var rcp = ProcessReflectionComposablePartDefinition(heap, rcpDef);
+                        rcp.IsCreated = true;
+                        MergeResults(RESULT, rcp);
+                    }
+                    else if (composablePartTypeName == TYPE_SingleExportComposablePart)
+                    {
+                        ulong export = ClrMdHelper.GetObjectAs<ulong>(heap, composablePart, FIELD_Export);
+                        ulong exportedValue = ClrMdHelper.GetObjectAs<ulong>(heap, export, FIELD_ExportedValue);
+                        string exportedValueTypeName = exportedValue != 0 ? heap.GetObjectType(exportedValue).Name : null;
+                        bool isCached = exportedValue != 0 && exportedValueTypeName != typeof(object).FullName;
+
+                        if (!isCached)
+                        {
+                            ulong realExportedValue = ClrMdHelper.GetLastObjectInHierarchy(heap, export, HIERARCHY_Func_To_ExportedValue, 0);
+
+                            if (realExportedValue != 0)
+                            {
+                                exportedValueTypeName = heap.GetObjectType(realExportedValue).Name;
+                            }
+                        }
+
+                        var exportDefinition = ClrMdHelper.GetObjectAs<ulong>(heap, export, FIELD_Definition);
+                        string contract = ClrMdHelper.GetObjectAs<string>(heap, exportDefinition, FIELD_ContractName);
+                        var metadata = ClrMdHelper.GetLastObjectInHierarchyAsKVPs(heap, exportDefinition, HIERARCHY_ExportDefinition_To_Metadata, 0, TYPE_KVP_String_Object);
+                        string typeId = "";
+
+                        foreach (var entry in metadata)
+                        {
+                            if (ClrMdHelper.GetStringContents(heap, entry.key) == CONST_ExportTypeIdentity)
+                            {
+                                typeId = ClrMdHelper.GetStringContents(heap, entry.value);
+                                break;
+                            }
+                        }
+
+                        var rcp = new ReflectionComposablePart();
+                        rcp.TypeName = exportedValueTypeName ?? typeId;
+                        rcp.IsCreated = true;
+                        rcp.Exports.Add(new ExportDefinition() { ContractName = contract, TypeIdentity = typeId });
+
+                        MergeResults(RESULT, rcp);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"WARNING: Unsupported ComposablePart was found: {composablePartTypeName}");
+                    }
                 }
             }
 
@@ -311,7 +322,11 @@ namespace MefDumper
                     }
                 }
 
-                DgmlHelper.CreateDgml($"{obj:X}.dgml", RESULT.Select(x=>x.Value));
+                DgmlHelper.CreateDgml($"{obj:X}.dgml", RESULT.Select(x => x.Value));
+            }
+            else
+            {
+                Console.WriteLine("INFO: No CatalogExportProvider was found.");
             }
         }
 
@@ -359,7 +374,7 @@ namespace MefDumper
                 container[rcp.TypeName] = rcp;
             }
         }
-                
+        
         private static ReflectionComposablePart ProcessReflectionComposablePartDefinition(ClrHeap heap, ulong part)
         {
             var rcp = new ReflectionComposablePart();
@@ -372,8 +387,22 @@ namespace MefDumper
 
             foreach (var importDef in importObjs)
             {
-                string contract = ClrMdHelper.GetObjectAs<string>(heap, importDef, FIELD_ContractName);
-                string typeId = ClrMdHelper.GetObjectAs<string>(heap, importDef, FIELD_RequiredTypeIdentity);
+                var importDefType = heap.GetObjectType(importDef);
+                var prodInfoDef = importDefType.GetFieldByName(ProductImportDefinition);
+
+                ulong imDef;
+
+                if (prodInfoDef != null)
+                {
+                    imDef = (ulong)prodInfoDef.GetValue(importDef);
+                }
+                else
+                {
+                    imDef = importDef;
+                }
+
+                string contract = ClrMdHelper.GetObjectAs<string>(heap, imDef, FIELD_ContractName);
+                string typeId = ClrMdHelper.GetObjectAs<string>(heap, imDef, FIELD_RequiredTypeIdentity);
                 rcp.Imports.Add(new ImportDefinition() { ContractName = contract, RequiredTypeIdentity = typeId });
             }
 
@@ -519,8 +548,8 @@ namespace MefDumper
         }
 
         private static readonly string[] HIERARCHY_AggregateCatalog_To_ComposablePartCatalogs = new string[] { "_catalogs", "_catalogs", "_items" };
-        private static readonly string[] HIERARCHY_CatalogExportProvider_To_Activated = new string[] { "_activatedParts", "entries" };
-        private static readonly string[] HIERARCHY_CompositionContainer_To_ComposableParts = new string[] { "_partExportProvider", "_parts", "_items" };
+        private static readonly string[] HIERARCHY_CatalogExportProvider_To_Activated = new string[] { "_activatedParts", "entries" };        
+        private static readonly string[] HIERARCHY_PartExportProvider_To_ComposableParts = new string[] { "_parts", "_items" };
         private static readonly string[] HIERARCHY_CreationInfo_To_ImportArray = new string[] { "_creationInfo", "_imports", "_items" };
         private static readonly string[] HIERARCHY_DirectoryCatalog_To_AssemblyCatalogs = new string[] { "_assemblyCatalogs", "entries" };
         private static readonly string[] HIERARCHY_ExportDefinition_To_Metadata = new string[] { "_metadata", "m_dictionary", "entries" };
@@ -539,10 +568,11 @@ namespace MefDumper
         private const string FIELD_ExportDefinition = "_exportDefinition";
         private const string FIELD_ExportedValue = "_exportedValue";
         private const string FIELD_Exports = "_exports";
-        private const string FIELD_Imports = "_imports";
         private const string FIELD_InnerCatalog = "_innerCatalog";
         private const string FIELD_List = "list";
         private const string FIELD_OriginalPartCreationInfo = "_originalPartCreationInfo";
+        private const string FIELD_PartExportProvider = "_partExportProvider";
+        private const string ProductImportDefinition = "_productImportDefinition";
         private const string FIELD_Providers = "_providers";
         private const string FIELD_RequiredTypeIdentity = "_requiredTypeIdentity";
         private const string FIELD_Type = "_type";

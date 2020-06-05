@@ -23,6 +23,12 @@ namespace WcfDumper.Helpers
         public static List<ulong> GetLastObjectInHierarchyAsArray(ClrHeap heap, ulong obj, string[] hierarchy, int currentIndex, string arrayTypeToVerify)
         {
             ulong arrayObj = GetLastObjectInHierarchy(heap, obj, hierarchy, currentIndex);
+
+            if (arrayObj == 0)
+            {
+                return new List<ulong>();
+            }
+
             ClrType arrayType = heap.GetObjectType(arrayObj);
 
             Debug.Assert(arrayType.Name == arrayTypeToVerify);
@@ -86,7 +92,20 @@ namespace WcfDumper.Helpers
         {
             ClrType type = heap.GetObjectType(heapobject);
             ClrInstanceField field = type.GetFieldByName(hierarchy[currentIndex]);
+
+            if (field == null)
+            {
+                Console.WriteLine($"ERROR: type '{type.Name}' does not have a field '{hierarchy[currentIndex]}'");
+                return 0L;
+            }
+
             ulong fieldValue = (ulong)field.GetValue(heapobject, false, false);
+
+            if (fieldValue == 0)
+            {
+                Console.WriteLine($"ERROR: the field value for '{hierarchy[currentIndex]}' was null on type '{type.Name}'  ");
+                return 0L;
+            }
 
             currentIndex++;
             if (currentIndex == hierarchy.Length)
