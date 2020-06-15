@@ -35,7 +35,7 @@ MefDumper -pid <processId>
 #### Limitations
 * For extensibility reasons, CompositionContainer [supports](https://docs.microsoft.com/en-us/dotnet/api/system.componentmodel.composition.hosting.compositioncontainer.-ctor?view=netframework-4.8) the concept of custom [ExportProviders](https://docs.microsoft.com/en-us/dotnet/api/system.componentmodel.composition.hosting.exportprovider?view=netframework-4.8) whose structure unfortunately can't be predicted. This approach is typically used in advanced scenarios, like when Visual Studio uses [its own](https://github.com/microsoft/vs-mef) MEF implementation.
 
-* There are some APis like [ComposeExportedValue](https://docs.microsoft.com/en-us/dotnet/api/system.componentmodel.composition.attributedmodelservices.composeexportedvalue?view=netframework-4.8) that allow you to put object instances into containers directly. When dumping managed assemblies such (hidden) exports can't be recognized.
+* There are some APis like [ComposeExportedValue](https://docs.microsoft.com/en-us/dotnet/api/system.componentmodel.composition.attributedmodelservices.composeexportedvalue?view=netframework-4.8) that allow you to put object instances into containers directly. When dumping managed assemblies such (hidden) exports can't be recognized. In the other scenarios however, you'll get full support for these objects.
 
 * There are some APis like [GetExportedValue](https://docs.microsoft.com/en-us/dotnet/api/system.componentmodel.composition.hosting.exportprovider.getexportedvalue?view=netframework-4.8) that allow you to retrieve objects from containers directly. Such (hidden) dependencies can't be recognized, unless you explicitly tell MEF about them. Given the following "hidden" dependency:
 	```
