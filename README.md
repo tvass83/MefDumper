@@ -52,3 +52,6 @@ MefDumper -pid <processId>
 Graph drawing and visualization is an extremely complex topic. (See this [handbook](http://cs.brown.edu/people/rtamassi/gdhandbook/) for a glimpse). That's why MefDumper creates [Directed Graph Markup Language (DGML)](https://docs.microsoft.com/en-us/visualstudio/modeling/directed-graph-markup-language-dgml-reference?view=vs-2019) files so that it can utilize the existing tooling out there. 
 
 I'd recommend using the DGML editor that [ships with Visual Studio 2017+](https://docs.microsoft.com/en-us/visualstudio/modeling/what-s-new-for-design-in-visual-studio?view=vs-2017#edition-support-for-architecture-and-modeling-tools). (You might have to install it from the Visual Studio installer "Individual components" tab.)
+
+If you like the project please consider a small donation via
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=57XFV9RLRQP52&source=url)
